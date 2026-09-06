@@ -163,7 +163,6 @@ FileDrop/
 ├── build.py             Script de compilation automatisée
 ├── filedrop.spec        Spécification multiplateforme PyInstaller
 ├── pyproject.toml        Configuration standard du package, dépendances et outils
-├── requirements.txt     Liste des dépendances Python (rétrocompatibilité)
 ├── LICENSE              Licence open-source MIT
 └── main.py              Point d'entrée de l'application
 ```
