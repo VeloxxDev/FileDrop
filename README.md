@@ -63,13 +63,21 @@ Accédez directement à la page des téléchargements :
    source .venv/bin/activate
    ```
 
-3. Installer les dépendances requises :
+3. Installer le paquet et ses dépendances :
    ```bash
-   pip install -r requirements.txt
+   # Installation standard
+   pip install .
+
+   # Ou installation en mode développement (avec linters et outils de test)
+   pip install -e ".[dev]"
    ```
 
 4. Démarrer l'application :
    ```bash
+   # Via la commande globale enregistrée
+   filedrop
+
+   # Ou directement via Python
    python main.py
    ```
 
@@ -154,7 +162,9 @@ FileDrop/
 ├── .github/workflows/   Pipeline d'intégration et de compilation CI/CD
 ├── build.py             Script de compilation automatisée
 ├── filedrop.spec        Spécification multiplateforme PyInstaller
-├── requirements.txt     Liste des dépendances Python
+├── pyproject.toml        Configuration standard du package, dépendances et outils
+├── requirements.txt     Liste des dépendances Python (rétrocompatibilité)
+├── LICENSE              Licence open-source MIT
 └── main.py              Point d'entrée de l'application
 ```
 
