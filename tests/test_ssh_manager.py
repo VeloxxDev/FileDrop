@@ -6,7 +6,7 @@ import paramiko
 
 from core.ssh_manager import SSHManager
 from models.connection_info import ConnectionInfo, AuthMethod
-from utils.exceptions import AuthenticationError, HostKeyError, DisconnectedError
+from utils.exceptions import AuthenticationError, DisconnectedError
 
 
 class TestSSHManager(unittest.TestCase):

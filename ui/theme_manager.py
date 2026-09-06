@@ -3,12 +3,11 @@
 import logging
 from pathlib import Path
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import QObject, QEvent
+from utils.platform_utils import set_window_dark_mode
 
 logger = logging.getLogger(__name__)
 
-
-from PyQt6.QtCore import QObject, QEvent
-from utils.platform_utils import set_window_dark_mode
 
 class WindowThemeFilter(QObject):
     """Filtre d'événements pour appliquer le thème sombre aux barres de titre de toutes les fenêtres (y compris QMessageBox)."""
@@ -49,12 +48,12 @@ class ThemeManager:
             with open(qss_path, "r", encoding="utf-8") as f:
                 stylesheet = f.read()
             app.setStyleSheet(stylesheet)
-            
+
             if cls._theme_filter:
                 app.removeEventFilter(cls._theme_filter)
             cls._theme_filter = WindowThemeFilter(theme_name, app)
             app.installEventFilter(cls._theme_filter)
-            
+
             for window in app.topLevelWidgets():
                 try:
                     set_window_dark_mode(int(window.winId()), dark=(theme_name == "dark"))

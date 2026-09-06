@@ -3,7 +3,6 @@
 import json
 import logging
 from dataclasses import dataclass, asdict
-from pathlib import Path
 
 from utils.platform_utils import get_config_directory
 

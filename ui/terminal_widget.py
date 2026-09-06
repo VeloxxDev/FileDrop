@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
     QLabel,
 )
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
-from PyQt6.QtGui import QTextCursor, QFont, QColor
+from PyQt6.QtGui import QTextCursor, QFont
 
 logger = logging.getLogger(__name__)
 

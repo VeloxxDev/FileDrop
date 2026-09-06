@@ -8,6 +8,8 @@ Permet de choisir entre 3 méthodes d'authentification :
 Inclut un système de favoris avec menu déroulant et bouton étoile.
 """
 
+from pathlib import Path
+
 from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -20,7 +22,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QStackedWidget,
 )
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, QTimer
 
 from models.connection_info import ConnectionInfo, AuthMethod
 from config.favorites import FavoritesManager
@@ -227,7 +229,6 @@ class ConnectionBar(QWidget):
 
         # Indique temporairement à l'utilisateur la confirmation de la sauvegarde
         self._save_fav_button.setText("★")
-        from PyQt6.QtCore import QTimer
         QTimer.singleShot(1500, lambda: self._save_fav_button.setText("☆"))
 
     def _on_delete_favorite(self):
@@ -247,7 +248,6 @@ class ConnectionBar(QWidget):
 
     def _browse_key_file(self):
         """Ouvre l'explorateur pour choisir un fichier de clé privée."""
-        from pathlib import Path
         ssh_dir = str(Path.home() / ".ssh")
         path, _ = QFileDialog.getOpenFileName(
             self,
