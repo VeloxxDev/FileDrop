@@ -285,6 +285,10 @@ class ConnectionBar(QWidget):
 
         self.connect_requested.emit(connection_info)
 
+    @property
+    def is_connected(self) -> bool:
+        return self._is_connected
+
     def set_connected(self, connected: bool):
         """Adapte l'intitulé du bouton et l'accessibilité des champs à l'état de la connexion."""
         self._is_connected = connected

@@ -8,6 +8,7 @@ import sys
 
 from PyQt6.QtWidgets import QApplication
 
+from __version__ import __version__
 from ui.main_window import MainWindow
 
 
@@ -18,7 +19,7 @@ def main():
 
     app = QApplication(sys.argv)
     app.setApplicationName("FileDrop")
-    app.setApplicationVersion("0.1.0")
+    app.setApplicationVersion(__version__)
     
     icon_path = os.path.join(os.path.dirname(__file__), "resources", "icons", "icon.png")
     if os.path.exists(icon_path):

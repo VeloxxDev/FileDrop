@@ -74,7 +74,12 @@ class SSHManager:
         """Paramètres de la connexion actuellement active."""
         return self._connection_info
 
-    def connect(self, connection_info: ConnectionInfo) -> None:
+    def connect(
+        self,
+        connection_info: ConnectionInfo,
+        timeout: int = 10,
+        keepalive_interval: int = 30,
+    ) -> None:
         """Établit et authentifie la session SSH selon les informations fournies."""
         self._connection_info = connection_info
         self._client = paramiko.SSHClient()
@@ -96,7 +101,7 @@ class SSHManager:
             "hostname": connection_info.host,
             "port": connection_info.port,
             "username": connection_info.username,
-            "timeout": 10,
+            "timeout": timeout,
         }
 
         try:
@@ -118,8 +123,9 @@ class SSHManager:
             self._client.connect(**kwargs)
 
             self._transport = self._client.get_transport()
-            if self._transport:
-                self._transport.set_keepalive(30)
+            # Maintient la connexion active pour éviter les déconnexions par les pare-feu/routeurs
+            if self._transport and keepalive_interval > 0:
+                self._transport.set_keepalive(keepalive_interval)
 
             logger.info("Connecté à %s", connection_info.display_name)
 

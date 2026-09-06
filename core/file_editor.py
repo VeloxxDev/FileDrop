@@ -10,7 +10,7 @@ import os
 import shutil
 from pathlib import PurePosixPath
 
-from PyQt6.QtCore import QObject, QFileSystemWatcher, QUrl, pyqtSignal
+from PyQt6.QtCore import QObject, QFileSystemWatcher, QUrl, pyqtSignal, QTimer
 from PyQt6.QtGui import QDesktopServices
 
 logger = logging.getLogger(__name__)
@@ -39,8 +39,20 @@ class RemoteFileEditor(QObject):
 
     def open_remote_file(self, sftp_manager, remote_path: str) -> str:
         """Télécharge une copie temporaire du fichier distant et lance l'éditeur par défaut."""
+        # Recrée le dossier temporaire si cleanup() a été appelé lors d'une déconnexion précédente
+        if not os.path.exists(self._temp_dir):
+            self._temp_dir = tempfile.mkdtemp(prefix="filedrop_edit_")
+
+        # Réutilise l'instance locale si le fichier est déjà ouvert pour éviter un re-téléchargement
+        for path, r_path in self._tracked_files.items():
+            if r_path == remote_path and os.path.exists(path):
+                QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+                return path
+
         filename = PurePosixPath(remote_path).name
-        local_path = os.path.join(self._temp_dir, filename)
+        # Sous-dossier isolé par fichier pour éviter les collisions de noms entre fichiers distants
+        file_dir = tempfile.mkdtemp(dir=self._temp_dir)
+        local_path = os.path.join(file_dir, filename)
 
         sftp_manager.download(remote_path, local_path)
 
@@ -59,9 +71,8 @@ class RemoteFileEditor(QObject):
 
         remote_path = self._tracked_files[local_path]
 
-        # Sur Windows, certains éditeurs recréent le fichier (atomic save)
+        # Sur Windows, certains éditeurs recréent le fichier (sauvegarde atomique)
         if not os.path.exists(local_path):
-            from PyQt6.QtCore import QTimer
             QTimer.singleShot(200, lambda: self._re_add_and_emit(local_path, remote_path))
             return
 
