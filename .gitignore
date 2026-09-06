@@ -10,9 +10,11 @@ venv/
 env/
 ENV/
 
-# Dossiers de compilation et artefacts PyInstaller
+# Dossiers de compilation et artefacts PyInstaller / Packaging
 build/
 dist/
+*.egg-info/
+.eggs/
 *.spec.bak
 *.zip
 *.tar.gz
