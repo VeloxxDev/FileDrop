@@ -38,7 +38,7 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 if sys.platform == 'win32':
     icon_file = os.path.join(project_dir, 'resources', 'icons', 'icon.ico')
 else:
-    icon_file = os.path.join(project_dir, 'resources', 'icons', 'icon.png')
+    icon_file = None
 
 exe = EXE(
     pyz,
