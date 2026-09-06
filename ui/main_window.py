@@ -37,6 +37,7 @@ from ui.theme_manager import ThemeManager
 from ui.settings_dialog import SettingsDialog
 from utils.platform_utils import set_window_dark_mode
 from PyQt6.QtGui import QAction
+from __version__ import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +169,7 @@ class MainWindow(QMainWindow):
         QMessageBox.about(
             self,
             "À propos de FileDrop",
-            "<h2>FileDrop v1.0.0</h2>"
+            f"<h2>FileDrop v{__version__}</h2>"
             "<p>Client SFTP graphique moderne, multiplateforme et sécurisé.</p>"
             "<p><b>Fonctionnalités :</b></p>"
             "<ul>"
@@ -273,7 +274,11 @@ class MainWindow(QMainWindow):
     def _on_connect(self, connection_info: ConnectionInfo):
         """Établit la connexion SSH/SFTP et démarre les sous-systèmes."""
         try:
-            self._ssh_manager.connect(connection_info)
+            self._ssh_manager.connect(
+                connection_info,
+                timeout=self._settings.connection_timeout,
+                keepalive_interval=self._settings.keepalive_interval,
+            )
             sftp_client = self._ssh_manager.open_sftp()
             self._sftp_manager = SFTPManager(sftp_client)
 
@@ -326,7 +331,7 @@ class MainWindow(QMainWindow):
 
     def _check_connection_health(self):
         """Surveille la santé du transport SSH et tente une reconnexion en cas de coupure."""
-        if not self._connection_bar._is_connected or self._reconnecting:
+        if not self._connection_bar.is_connected or self._reconnecting:
             return
 
         if not self._ssh_manager.is_connected:
@@ -361,7 +366,11 @@ class MainWindow(QMainWindow):
         if not self._last_connection_info:
             return
         try:
-            self._ssh_manager.connect(self._last_connection_info)
+            self._ssh_manager.connect(
+                self._last_connection_info,
+                timeout=self._settings.connection_timeout,
+                keepalive_interval=self._settings.keepalive_interval,
+            )
             sftp_client = self._ssh_manager.open_sftp()
             self._sftp_manager = SFTPManager(sftp_client)
             self._remote_panel.set_sftp_manager(self._sftp_manager)

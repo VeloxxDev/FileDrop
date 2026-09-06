@@ -2,6 +2,7 @@
 
 import unittest
 from unittest.mock import MagicMock, patch
+import paramiko
 
 from core.ssh_manager import SSHManager
 from models.connection_info import ConnectionInfo, AuthMethod
@@ -41,9 +42,23 @@ class TestSSHManager(unittest.TestCase):
         mock_transport.set_keepalive.assert_called_with(30)
 
     @patch("paramiko.SSHClient")
+    def test_connect_custom_timeout_and_keepalive(self, mock_client_cls):
+        """Vérifie la transmission correcte des paramètres de timeout et keepalive."""
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_transport = MagicMock()
+        mock_transport.is_active.return_value = True
+        mock_client.get_transport.return_value = mock_transport
+
+        self.manager.connect(self.conn_info, timeout=25, keepalive_interval=60)
+
+        kwargs = mock_client.connect.call_args[1]
+        self.assertEqual(kwargs["timeout"], 25)
+        mock_transport.set_keepalive.assert_called_with(60)
+
+    @patch("paramiko.SSHClient")
     def test_connect_authentication_failure(self, mock_client_cls):
         """Vérifie qu'une erreur d'authentification lève AuthenticationError."""
-        import paramiko
         mock_client = MagicMock()
         mock_client_cls.return_value = mock_client
         mock_client.connect.side_effect = paramiko.AuthenticationException("Auth error")
