@@ -75,5 +75,6 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          name: FileDrop ${{ github.ref_name }} — Client SFTP Graphique Multiplateforme
+          body_path: .github/release_template.md
           files: ${{ matrix.artifact_filename }}
-          generate_release_notes: true
