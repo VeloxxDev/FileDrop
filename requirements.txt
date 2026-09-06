@@ -1,0 +1,7 @@
+# FileDrop - Client SFTP graphique
+# Python 3.10+
+
+PyQt6>=6.5.0          # Interface graphique cross-platform
+paramiko>=3.0.0       # SSH/SFTP (pure Python)
+cryptography>=41.0    # Requis par Paramiko pour les clés SSH
+pyinstaller>=6.0      # Packaging exécutable autonome

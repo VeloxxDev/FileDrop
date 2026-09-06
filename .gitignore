@@ -1,0 +1,24 @@
+# Bytecode Python et caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+
+# Environnements virtuels
+.venv/
+venv/
+env/
+ENV/
+
+# Dossiers de compilation et artefacts PyInstaller
+build/
+dist/
+*.spec.bak
+
+# IDEs et éditeurs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store

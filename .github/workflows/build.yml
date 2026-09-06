@@ -1,0 +1,79 @@
+name: Build & Release Multiplateforme
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build sur ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_filename: FileDrop-Windows.zip
+          - os: ubuntu-latest
+            artifact_filename: FileDrop-Linux.tar.gz
+          - os: macos-latest
+            artifact_filename: FileDrop-macOS.zip
+
+    steps:
+      - name: Récupérer le code source
+        uses: actions/checkout@v4
+
+      - name: Configurer Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Dépendances système Linux (Qt)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgl1-mesa-dev libxkbcommon-x11-0 libegl1-mesa libfontconfig1 libdbus-1-3
+
+      - name: Installer les dépendances Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Exécuter les tests unitaires
+        run: |
+          python -m unittest discover tests
+
+      - name: Compiler avec PyInstaller
+        run: |
+          pyinstaller --noconfirm filedrop.spec
+
+      - name: Compresser le binaire (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\FileDrop\* -DestinationPath FileDrop-Windows.zip
+
+      - name: Compresser le binaire (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          tar -czvf FileDrop-Linux.tar.gz -C dist FileDrop
+
+      - name: Compresser le binaire (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          zip -r ../FileDrop-macOS.zip FileDrop.app
+
+      - name: Publier les fichiers sur la Release GitHub
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.artifact_filename }}
+          generate_release_notes: true
