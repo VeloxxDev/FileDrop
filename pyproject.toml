@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "filedrop"
+dynamic = ["version"]
+description = "Client SFTP graphique multiplateforme, moderne et sécurisé."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "VeloxxDev", email = "iwan.clemente@gmail.com"},
+]
+dependencies = [
+    "PyQt6>=6.5.0",
+    "paramiko>=3.0.0",
+    "cryptography>=41.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pyinstaller>=6.0",
+    "pillow>=10.0.0",
+    "ruff>=0.1.0",
+    "coverage>=7.0.0",
+]
+
+[project.scripts]
+filedrop = "main:main"
+
+[project.gui-scripts]
+filedrop-gui = "main:main"
+
+[tool.setuptools]
+py-modules = ["main", "__version__", "build"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["config*", "core*", "models*", "ui*", "utils*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "__version__.__version__"}
+
+[tool.setuptools.package-data]
+"*" = ["*.qss", "*.png", "*.ico", "*.icns"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]
+
+[tool.coverage.run]
+source = ["config", "core", "models", "ui", "utils"]
+omit = ["tests/*", "build.py"]
+
+[tool.coverage.report]
+show_missing = true
