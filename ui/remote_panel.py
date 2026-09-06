@@ -13,7 +13,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QTreeWidget,
     QTreeWidgetItem,
-    QLineEdit,
     QPushButton,
     QLabel,
     QHeaderView,

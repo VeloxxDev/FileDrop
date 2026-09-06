@@ -6,7 +6,7 @@ ou de cliquer dans la zone vide pour saisir/coller un chemin complet.
 
 import os
 import sys
-from pathlib import Path, PurePosixPath, PureWindowsPath
+from pathlib import Path, PurePosixPath
 
 from PyQt6.QtWidgets import (
     QWidget,
@@ -18,7 +18,7 @@ from PyQt6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
 )
-from PyQt6.QtCore import pyqtSignal, Qt, QEvent
+from PyQt6.QtCore import pyqtSignal, Qt, QEvent, QTimer
 
 
 class BreadcrumbBar(QWidget):
@@ -73,7 +73,7 @@ class BreadcrumbBar(QWidget):
         self._edit_input.installEventFilter(self)
 
         main_layout.addWidget(self._stack)
-        
+
         # Aligne la hauteur sur les champs de saisie standards pour l'homogénéité visuelle
         self.setMaximumHeight(28)
 
@@ -112,7 +112,6 @@ class BreadcrumbBar(QWidget):
         self._stack.setCurrentIndex(0)
 
         # Défile vers l'extrémité droite pour révéler le dossier le plus profond
-        from PyQt6.QtCore import QTimer
         QTimer.singleShot(50, lambda: self._scroll_area.horizontalScrollBar().setValue(
             self._scroll_area.horizontalScrollBar().maximum()
         ))
@@ -182,8 +181,8 @@ class BreadcrumbBar(QWidget):
             return super().eventFilter(watched, event)
 
         # Reproduit l'ergonomie de l'explorateur Windows en ouvrant l'édition sur un clic du fond
-        if (watched in (self._crumb_container, self._scroll_area) 
-                and event.type() == QEvent.Type.MouseButtonPress 
+        if (watched in (self._crumb_container, self._scroll_area)
+                and event.type() == QEvent.Type.MouseButtonPress
                 and event.button() == Qt.MouseButton.LeftButton):
             child = self._crumb_container.childAt(event.pos())
             if not isinstance(child, QPushButton):

@@ -24,3 +24,10 @@ dist/
 *.swo
 *~
 .DS_Store
+
+# Couverture de test et linters
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.ruff_cache/

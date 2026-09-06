@@ -4,7 +4,6 @@ from PyQt6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QPushButton,
-    QSizePolicy,
 )
 from PyQt6.QtCore import pyqtSignal
 

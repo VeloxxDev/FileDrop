@@ -1,5 +1,6 @@
 """Utilitaires cross-platform (détection OS, chemins par défaut)."""
 
+import ctypes
 import os
 import platform
 from pathlib import Path, PurePosixPath
@@ -46,7 +47,7 @@ def get_config_directory() -> Path:
 
 def normalize_remote_path(path: str) -> str:
     """Convertit un chemin distant en notation POSIX standard."""
-    return str(PurePosixPath(path))
+    return str(PurePosixPath(path.replace("\\", "/")))
 
 
 def set_window_dark_mode(hwnd: int, dark: bool = True) -> bool:
@@ -54,9 +55,6 @@ def set_window_dark_mode(hwnd: int, dark: bool = True) -> bool:
     if get_os_name() != "windows":
         return False
     try:
-        import ctypes
-        from ctypes import wintypes
-
         # DWMWA_USE_IMMERSIVE_DARK_MODE : 20 sur Windows 11 / Windows 10 20H1+
         # DWMWA_USE_IMMERSIVE_DARK_MODE_OLD : 19 sur Windows 10 1809 - 1909
         DWMWA_USE_IMMERSIVE_DARK_MODE = 20
@@ -76,7 +74,7 @@ def set_window_dark_mode(hwnd: int, dark: bool = True) -> bool:
                 ctypes.byref(value),
                 ctypes.sizeof(value),
             )
-            
+
         # Rafraîchir la fenêtre pour appliquer la bordure immédiatement
         SWP_NOSIZE = 0x0001
         SWP_NOMOVE = 0x0002

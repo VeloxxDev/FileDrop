@@ -1,5 +1,6 @@
 """Modèle de données pour les tâches de transfert."""
 
+import os
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from datetime import datetime
@@ -42,7 +43,6 @@ class TransferTask:
     @property
     def filename(self) -> str:
         """Nom du fichier déduit du chemin selon le sens du transfert."""
-        import os
         if self.direction == TransferDirection.UPLOAD:
             return os.path.basename(self.local_path)
         else:

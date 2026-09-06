@@ -1,6 +1,5 @@
 """Script de compilation automatique pour FileDrop avec PyInstaller."""
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -28,7 +27,7 @@ def build():
         dist_exe = project_root / "dist" / "FileDrop" / "FileDrop.exe"
         print("\n========================================")
         print("   Compilation réussie avec succès !")
-        print(f"   Exécutable disponible dans :")
+        print("   Exécutable disponible dans :")
         print(f"   {dist_exe}")
         print("========================================")
     else:

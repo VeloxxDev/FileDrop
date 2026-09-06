@@ -4,7 +4,7 @@ import stat
 import unittest
 from unittest.mock import MagicMock
 
-from core.sftp_manager import SFTPManager, RemoteFileInfo
+from core.sftp_manager import SFTPManager
 
 
 class TestSFTPManager(unittest.TestCase):

@@ -3,7 +3,6 @@
 import unittest
 from utils.formatters import (
     format_size,
-    format_timestamp,
     format_permissions,
     format_transfer_speed,
 )

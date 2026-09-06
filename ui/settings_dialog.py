@@ -3,12 +3,9 @@
 from PyQt6.QtWidgets import (
     QDialog,
     QVBoxLayout,
-    QHBoxLayout,
     QFormLayout,
-    QLabel,
     QComboBox,
     QSpinBox,
-    QPushButton,
     QDialogButtonBox,
 )
 from PyQt6.QtCore import pyqtSignal, Qt
