@@ -45,11 +45,12 @@ class TestPlatformUtils(unittest.TestCase):
 
     def test_get_config_directory_windows(self):
         """Vérifie le chemin de configuration sous Windows."""
+        fake_appdata = "C:\\AppData" if os.name == "nt" else "/mock/appdata"
         with patch("utils.platform_utils.get_os_name", return_value="windows"), \
-             patch.dict(os.environ, {"APPDATA": "C:\\AppData"}):
+             patch.dict(os.environ, {"APPDATA": fake_appdata}):
             with patch("pathlib.Path.mkdir"):
                 config_dir = get_config_directory()
-                self.assertEqual(config_dir, Path("C:\\AppData\\FileDrop"))
+                self.assertEqual(config_dir, Path(fake_appdata) / "FileDrop")
 
     def test_get_config_directory_macos(self):
         """Vérifie le chemin de configuration sous macOS."""
@@ -65,7 +66,7 @@ class TestPlatformUtils(unittest.TestCase):
              patch.dict(os.environ, {"XDG_CONFIG_HOME": "/custom/config"}):
             with patch("pathlib.Path.mkdir"):
                 config_dir = get_config_directory()
-                self.assertEqual(config_dir, Path("/custom/config/FileDrop"))
+                self.assertEqual(config_dir, Path("/custom/config") / "FileDrop")
 
     def test_set_window_dark_mode_non_windows(self):
         """Vérifie que la fonction retourne False silencieusement sur les OS non-Windows."""
