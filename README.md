@@ -153,7 +153,7 @@ L'exécutable généré sera placé dans le répertoire `dist/FileDrop/`.
 ```text
 FileDrop/
 ├── config/              Gestion des paramètres locaux et des favoris
-├── core/                Moteur réseau Paramiko (SSH, SFTP, transferts, éditeur)
+├── core/                Moteur réseau Paramiko (SSH, SFTP, transferts, éditeur) et gestionnaire de file d'attente
 ├── models/              Structures de données (dataclasses et énumérations)
 ├── ui/                  Composants graphiques PyQt6 et gestion des vues
 ├── utils/               Fonctions transversales (formatage, intégration OS)
