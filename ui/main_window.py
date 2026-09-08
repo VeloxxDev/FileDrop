@@ -1,12 +1,11 @@
 """Fenêtre principale de FileDrop.
 
 Orchestre la barre de connexion, l'explorateur double panneau (local et distant),
-les transferts multithreadés avec file d'attente, le terminal interactif et les logs.
+le gestionnaire de transferts, le terminal interactif et les logs.
 """
 
 import logging
 import os
-from pathlib import PurePosixPath
 
 from PyQt6.QtWidgets import (
     QMainWindow,
@@ -28,7 +27,7 @@ from ui.transfer_queue import TransferQueueWidget
 from ui.terminal_widget import TerminalWidget
 from core.ssh_manager import SSHManager
 from core.sftp_manager import SFTPManager
-from core.transfer_worker import TransferWorker
+from core.transfer_manager import TransferManager
 from core.file_editor import RemoteFileEditor
 from config.settings import AppSettings
 from models.transfer_task import TransferTask, TransferDirection, TransferStatus
@@ -77,8 +76,10 @@ class MainWindow(QMainWindow):
         self._sftp_manager: SFTPManager | None = None
         self._file_editor = RemoteFileEditor(self)
 
-        self._pending_tasks: list[TransferTask] = []
-        self._active_workers: list[TransferWorker] = []
+        self._transfer_manager = TransferManager(
+            max_concurrent=self._settings.max_concurrent_transfers,
+            parent=self,
+        )
 
         self._last_connection_info: ConnectionInfo | None = None
         self._reconnecting = False
@@ -139,6 +140,7 @@ class MainWindow(QMainWindow):
     def _on_settings_updated(self):
         """Appelé quand les paramètres ont été modifiés."""
         self._apply_theme_and_titlebar(self._settings.theme)
+        self._transfer_manager.set_max_concurrent(self._settings.max_concurrent_transfers)
 
     def _toggle_theme(self):
         """Bascule rapidement entre le thème sombre et clair."""
@@ -253,10 +255,15 @@ class MainWindow(QMainWindow):
         self._remote_panel.drop_upload_requested.connect(self._on_drop_upload)
         self._local_panel.drop_download_requested.connect(self._on_drop_download)
 
-        self._transfer_queue.cancel_requested.connect(self._on_cancel_transfer)
+        self._transfer_queue.cancel_requested.connect(self._transfer_manager.cancel_transfer)
 
         self._remote_panel.edit_requested.connect(self._on_edit_remote_file)
         self._file_editor.upload_needed.connect(self._on_remote_file_modified)
+
+        self._transfer_manager.task_added.connect(self._on_task_added)
+        self._transfer_manager.task_updated.connect(self._transfer_queue.update_task)
+        self._transfer_manager.task_finished.connect(self._on_task_finished)
+        self._transfer_manager.queue_changed.connect(self._on_queue_changed)
 
     def _on_verify_host_key(self, hostname: str, key_type: str, fingerprint: str) -> bool:
         """Demande confirmation à l'utilisateur lors de la première connexion à un serveur."""
@@ -287,6 +294,8 @@ class MainWindow(QMainWindow):
             self._remote_panel.set_sftp_manager(self._sftp_manager)
             self._remote_panel.refresh()
 
+            self._transfer_manager.set_transport(self._ssh_manager.transport)
+
             try:
                 channel = self._ssh_manager.invoke_shell()
                 self._terminal_widget.start_session(channel)
@@ -312,9 +321,7 @@ class MainWindow(QMainWindow):
         self._health_timer.stop()
         self._reconnecting = False
 
-        for worker in self._active_workers:
-            worker.cancel()
-        self._pending_tasks.clear()
+        self._transfer_manager.cancel_all()
 
         self._terminal_widget.stop_session()
         self._file_editor.cleanup()
@@ -324,6 +331,7 @@ class MainWindow(QMainWindow):
             self._sftp_manager = None
 
         self._ssh_manager.disconnect()
+        self._transfer_manager.set_transport(None)
         self._remote_panel.clear()
         self._connection_bar.set_connected(False)
         self._transfer_buttons.set_enabled(False)
@@ -376,6 +384,8 @@ class MainWindow(QMainWindow):
             self._remote_panel.set_sftp_manager(self._sftp_manager)
             self._remote_panel.refresh()
 
+            self._transfer_manager.set_transport(self._ssh_manager.transport)
+
             try:
                 channel = self._ssh_manager.invoke_shell()
                 self._terminal_widget.start_session(channel)
@@ -387,7 +397,6 @@ class MainWindow(QMainWindow):
             self._status_bar.showMessage(f"Reconnecté à {self._last_connection_info.display_name}")
             logger.info("Reconnexion automatique réussie !")
 
-            self._process_transfer_queue()
         except Exception as e:
             logger.warning("Échec de la tentative de reconnexion : %s", e)
             self._reconnecting = False
@@ -410,103 +419,33 @@ class MainWindow(QMainWindow):
     def _on_remote_file_modified(self, local_path: str, remote_path: str):
         """Re-upload automatiquement le fichier distant après modification locale."""
         logger.info("Sauvegarde détectée, re-upload automatique de %s", remote_path)
-        self._start_transfer(
+        self._transfer_manager.start_transfer(
             local_path=local_path,
             remote_path=remote_path,
             direction=TransferDirection.UPLOAD,
         )
 
-    def _start_transfer(
-        self,
-        local_path: str,
-        remote_path: str,
-        direction: TransferDirection,
-    ):
-        """Ajoute un transfert à la file d'attente et traite la file selon la limite."""
-        task = TransferTask(
-            local_path=local_path,
-            remote_path=remote_path,
-            direction=direction,
-        )
-
+    def _on_task_added(self, task: TransferTask):
+        """Ajoute la tâche au widget de file d'attente et bascule l'onglet."""
         self._transfer_queue.add_task(task)
-        self._pending_tasks.append(task)
         self._bottom_tabs.setCurrentWidget(self._transfer_queue)
 
-        self._process_transfer_queue()
-
-    def _process_transfer_queue(self):
-        """Démarre les transferts en attente jusqu'à concurrence maximale."""
-        transport = self._ssh_manager.transport
-        if not transport or not self._ssh_manager.is_connected:
-            return
-
-        max_concurrent = self._settings.max_concurrent_transfers
-
-        while self._pending_tasks and len(self._active_workers) < max_concurrent:
-            task = self._pending_tasks.pop(0)
-
-            worker = TransferWorker(transport, task, parent=self)
-            worker.progress_updated.connect(self._on_transfer_progress)
-            worker.transfer_finished.connect(self._on_transfer_finished)
-
-            self._active_workers.append(worker)
-            worker.start()
-
-            direction_label = "Upload" if task.direction == TransferDirection.UPLOAD else "Download"
-            logger.info("%s démarré : %s", direction_label, task.filename)
-
-        self._update_status_bar()
-
-    def _on_transfer_progress(self, task: TransferTask, bytes_done: int, total: int):
-        """Met à jour l'affichage de progression de la tâche."""
+    def _on_task_finished(self, task: TransferTask):
+        """Met à jour le widget et rafraîchit le panneau distant après un upload réussi."""
         self._transfer_queue.update_task(task)
+        if task.status == TransferStatus.COMPLETED and task.direction == TransferDirection.UPLOAD:
+            self._remote_panel.refresh()
 
-    def _on_transfer_finished(self, task: TransferTask):
-        """Traite la fin d'un transfert et lance le suivant dans la file."""
-        self._active_workers = [w for w in self._active_workers if w.task is not task]
-        self._transfer_queue.update_task(task)
-
-        if task.status == TransferStatus.COMPLETED:
-            logger.info("Terminé : %s", task.filename)
-            if task.direction == TransferDirection.UPLOAD and self._remote_panel:
-                self._remote_panel.refresh()
-        elif task.status == TransferStatus.FAILED:
-            logger.error("Échec : %s — %s", task.filename, task.error_message)
-        elif task.status == TransferStatus.CANCELLED:
-            logger.info("Annulé : %s", task.filename)
-
-        self._process_transfer_queue()
-
-    def _on_cancel_transfer(self, task: TransferTask):
-        """Annule un transfert actif ou retire une tâche en attente."""
-        if task in self._pending_tasks:
-            self._pending_tasks.remove(task)
-            task.status = TransferStatus.CANCELLED
-            self._transfer_queue.update_task(task)
-            logger.info("Tâche en attente annulée : %s", task.filename)
-            self._update_status_bar()
-            return
-
-        for worker in self._active_workers:
-            if worker.task is task:
-                worker.cancel()
-                logger.info("Annulation demandée : %s", task.filename)
-                break
-
-    def _update_status_bar(self):
-        """Met à jour les informations dans la barre d'état."""
-        active = len(self._active_workers)
-        queued = len(self._pending_tasks)
-
-        if active == 0 and queued == 0:
+    def _on_queue_changed(self, active: int, pending: int):
+        """Met à jour la barre de statut avec les compteurs de transferts."""
+        if active == 0 and pending == 0:
             if self._ssh_manager.is_connected:
                 self._status_bar.showMessage("Connecté — Aucun transfert en cours")
             else:
                 self._status_bar.showMessage("Prêt — Non connecté")
         else:
             self._status_bar.showMessage(
-                f"Transferts : {active} actif(s), {queued} en attente"
+                f"Transferts : {active} actif(s), {pending} en attente"
             )
 
     def _on_upload(self):
@@ -526,109 +465,46 @@ class MainWindow(QMainWindow):
         self._on_download_entries(selected)
 
     def _on_upload_paths(self, paths: list):
-        """Met en file d'attente l'envoi d'une liste de chemins locaux."""
+        """Délègue l'upload au gestionnaire de transferts."""
         if not self._ssh_manager.is_connected or not self._sftp_manager:
             self._status_bar.showMessage("Non connecté")
             return
-
-        remote_dir = self._sftp_manager.current_path
-        for local_path in paths:
-            if os.path.isdir(local_path):
-                self._upload_directory(local_path, remote_dir)
-            else:
-                filename = os.path.basename(local_path)
-                remote_path = str(PurePosixPath(remote_dir) / filename)
-                self._start_transfer(local_path, remote_path, TransferDirection.UPLOAD)
+        self._transfer_manager.upload_paths(paths, self._sftp_manager.current_path, self._sftp_manager)
 
     def _on_download_entries(self, entries: list):
-        """Met en file d'attente le téléchargement d'une liste d'entrées distantes."""
+        """Délègue le download au gestionnaire de transferts."""
         if not self._ssh_manager.is_connected:
             return
-
-        local_dir = self._local_panel.current_path
-        for entry in entries:
-            if entry.is_dir:
-                self._download_directory(entry.filepath, local_dir)
-            else:
-                local_path = os.path.join(local_dir, entry.filename)
-                self._start_transfer(local_path, entry.filepath, TransferDirection.DOWNLOAD)
+        self._transfer_manager.download_entries(entries, self._local_panel.current_path, self._sftp_manager)
 
     def _on_drop_upload(self, local_paths: list[str], remote_target_dir: str):
         """Gère le dépôt de fichiers locaux vers un répertoire distant."""
         if not self._ssh_manager.is_connected or not self._sftp_manager:
             self._status_bar.showMessage("Non connecté")
             return
-
         target_dir = remote_target_dir if remote_target_dir else self._sftp_manager.current_path
-        for local_path in local_paths:
-            if os.path.isdir(local_path):
-                self._upload_directory(local_path, target_dir)
-            else:
-                filename = os.path.basename(local_path)
-                remote_path = str(PurePosixPath(target_dir) / filename)
-                self._start_transfer(local_path, remote_path, TransferDirection.UPLOAD)
+        self._transfer_manager.upload_paths(local_paths, target_dir, self._sftp_manager)
 
     def _on_drop_download(self, entries_data: list[dict], local_target_dir: str):
         """Gère le dépôt d'éléments distants vers un répertoire local."""
         if not self._ssh_manager.is_connected:
             return
-
         target_dir = local_target_dir if local_target_dir else self._local_panel.current_path
+
         for entry_data in entries_data:
             remote_path = entry_data["path"]
             is_dir = entry_data["is_dir"]
-            filename = PurePosixPath(remote_path).name
+            filename = remote_path.rsplit("/", 1)[-1]
 
             if is_dir:
-                self._download_directory(remote_path, target_dir)
+                self._transfer_manager.download_directory(remote_path, target_dir, self._sftp_manager)
             else:
-                local_path = os.path.join(target_dir, filename)
-                self._start_transfer(local_path, remote_path, TransferDirection.DOWNLOAD)
-
-    def _upload_directory(self, local_dir_path: str, remote_parent: str):
-        """Téléverse récursivement un dossier local vers le serveur distant."""
-        dir_name = os.path.basename(local_dir_path)
-        remote_dir = str(PurePosixPath(remote_parent) / dir_name)
-
-        try:
-            self._sftp_manager.mkdir(remote_dir)
-            logger.info("Dossier créé : %s", remote_dir)
-        except IOError:
-            pass
-
-        try:
-            for item in os.listdir(local_dir_path):
-                item_path = os.path.join(local_dir_path, item)
-                if os.path.isdir(item_path):
-                    self._upload_directory(item_path, remote_dir)
-                else:
-                    remote_path = str(PurePosixPath(remote_dir) / item)
-                    self._start_transfer(item_path, remote_path, TransferDirection.UPLOAD)
-        except Exception as e:
-            logger.error("Erreur parcours upload %s : %s", local_dir_path, e)
-
-    def _download_directory(self, remote_dir_path: str, local_parent: str):
-        """Télécharge récursivement un dossier distant vers le système local."""
-        dir_name = PurePosixPath(remote_dir_path).name
-        local_dir = os.path.join(local_parent, dir_name)
-
-        os.makedirs(local_dir, exist_ok=True)
-        logger.info("Dossier créé localement : %s", local_dir)
-
-        try:
-            entries = self._sftp_manager.list_directory(remote_dir_path)
-            for entry in entries:
-                if entry.is_dir:
-                    self._download_directory(entry.filepath, local_dir)
-                else:
-                    local_path = os.path.join(local_dir, entry.filename)
-                    self._start_transfer(local_path, entry.filepath, TransferDirection.DOWNLOAD)
-        except Exception as e:
-            logger.error("Erreur parcours download %s : %s", remote_dir_path, e)
+                self._transfer_manager.start_transfer(
+                    os.path.join(target_dir, filename), remote_path, TransferDirection.DOWNLOAD
+                )
 
     def closeEvent(self, event):
         """Ferme proprement l'application en attendant les workers."""
         self._on_disconnect()
-        for worker in self._active_workers:
-            worker.wait(1000)
+        self._transfer_manager.wait_for_workers(1000)
         super().closeEvent(event)
